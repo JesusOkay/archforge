@@ -1,0 +1,21 @@
+#!/bin/bash
+# archforge-makepkg - Wrapper universal de makepkg para archforge
+# Se instala como /usr/local/bin/makepkg en la máquina cliente
+# Intercepta builds y los envia al servidor, queries van al makepkg real
+
+# Si no hay PKGBUILD, usar el makepkg real del sistema
+if [[ ! -f "PKGBUILD" ]]; then
+    exec /usr/bin/makepkg "$@"
+fi
+
+# Pasar consultas/queries al makepkg real (paru/yay las necesitan)
+for arg in "$@"; do
+    case "$arg" in
+        --packagelist|--printsrcinfo|-g|--geninteg|--verifysource|--help|-h|--version|-V)
+            exec /usr/bin/makepkg "$@"
+            ;;
+    esac
+done
+
+# Build real -> enviar al servidor archforge (siempre)
+archforge-remote "$(pwd)"

@@ -1,0 +1,15 @@
+#!/bin/bash
+# archforge-remote - Envía el build al servidor archforge y recupera el paquete
+# Se instala en la máquina cliente (N100)
+
+BUILD_SERVER="192.168.20.2"
+BUILD_USER="jesus"
+PKG_DIR="$(realpath "$1")"
+PKG_NAME=$(grep -m1 '^pkgname=' "$PKG_DIR/PKGBUILD" | cut -d= -f2 | tr -d "'" | tr -d '"' | head -n1)
+REMOTE_DIR="builds/$PKG_NAME"
+
+ssh "${BUILD_USER}@${BUILD_SERVER}" "mkdir -p ~/${REMOTE_DIR}"
+rsync -az --exclude='*.pkg.tar.*' --exclude='src/' --exclude='pkg/' --exclude='.git/' "$PKG_DIR/" "${BUILD_USER}@${BUILD_SERVER}:~/${REMOTE_DIR}/"
+ssh -t "${BUILD_USER}@${BUILD_SERVER}" "archforge ~/${REMOTE_DIR}"
+rsync -az --include='*.pkg.tar.*' --exclude='*' "${BUILD_USER}@${BUILD_SERVER}:~/${REMOTE_DIR}/" "$PKG_DIR/"
+ssh "${BUILD_USER}@${BUILD_SERVER}" "rm -rf ~/${REMOTE_DIR}" 2>/dev/null || true

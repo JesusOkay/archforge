@@ -1,0 +1,64 @@
+#!/bin/bash
+# archforge - Compila paquetes Arch Linux en Docker con la potencia de tu servidor
+# Uso: archforge /ruta/al/directorio/con/PKGBUILD
+
+set -euo pipefail
+
+# --- Configuración ---
+DOCKER_IMAGE="archforge"
+
+# --- Colores ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log()  { echo -e "${CYAN}[archforge]${NC} $1"; }
+ok()   { echo -e "${GREEN}[✓]${NC} $1"; }
+err()  { echo -e "${RED}[✗]${NC} $1" >&2; }
+
+# --- Validación ---
+if [[ $# -lt 1 ]]; then
+    echo "Uso: archforge <directorio-con-PKGBUILD>"
+    exit 1
+fi
+
+PKG_DIR="$(realpath "$1")"
+
+if [[ ! -d "$PKG_DIR" ]]; then
+    err "El directorio '$PKG_DIR' no existe."
+    exit 1
+fi
+
+if [[ ! -f "$PKG_DIR/PKGBUILD" ]]; then
+    err "No se encontró PKGBUILD en '$PKG_DIR'."
+    exit 1
+fi
+
+# Extraer nombre del paquete
+PKG_NAME=$(grep -m1 '^pkgname=' "$PKG_DIR/PKGBUILD" | cut -d= -f2 | tr -d "'" | tr -d '"')
+log "Compilando: ${GREEN}${PKG_NAME}${NC}"
+
+# --- Verificar Docker ---
+if ! docker info &>/dev/null 2>&1; then
+    err "Docker no está corriendo o no tienes permisos."
+    exit 1
+fi
+
+# --- Build ---
+
+log "Iniciando build en Docker..."
+echo ""
+
+docker run --rm -v "$PKG_DIR:/pkg" "$DOCKER_IMAGE" \
+    bash -c "sudo pacman -Sy --noconfirm &>/dev/null && makepkg -sf --noconfirm"
+
+BUILD_EXIT=$?
+
+echo ""
+if [[ $BUILD_EXIT -eq 0 ]]; then
+    ok "Build completado con éxito!"
+else
+    err "Build fallido"
+    exit $BUILD_EXIT
+fi
